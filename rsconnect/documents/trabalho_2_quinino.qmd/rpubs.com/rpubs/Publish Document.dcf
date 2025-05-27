@@ -1,0 +1,10 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/1315234/c87be24623134e4895d3c559b1f37c63
+bundleId: https://api.rpubs.com/api/v1/document/1315234/c87be24623134e4895d3c559b1f37c63
+url: http://rpubs.com/fabrch/1315234
+version: 1

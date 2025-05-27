@@ -29,7 +29,7 @@ library(survival)
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
 ```
 
-## 1\. Introdução
+## Introdução
 
 O objetivo deste trabalho é determinar uma política ótima de manutenção para um conjunto de transformadores de alta potência de uma empresa de energia elétrica. Após uma falha, os custos de reparo são elevados e a companhia pode ser multada por interrupções não programadas no fornecimento de energia [@fonteEmpresaAno]. Uma estratégia de manutenção preventiva bem definida é crucial para otimizar recursos e aumentar a confiabilidade do sistema elétrico [@normaSetorAno].
 
@@ -38,7 +38,7 @@ Nesta análise, consideramos dois tipos de intervenção:
   - **Reparo Mínimo (MR - *Minimal Repair*):** Realizado após uma falha. Restaura a função do equipamento, mas o retorna à condição de confiabilidade exata de antes da falha, ou seja, "tão ruim quanto antes" (*bad as old*) [@barlow1975; @brown1981].
   - **Manutenção Preventiva (PM - *Preventive Maintenance*):** Ação planejada e completa que retorna o sistema a um estado de "como novo" (*good as new*) [@nakagawa2007]. Para encontrar o equilíbrio ideal entre essas intervenções, é fundamental modelar matematicamente como as falhas ocorrem ao longo do tempo.
 
-## 2\. Modelagem do Processo de Falhas
+## Modelagem do Processo de Falhas
 
 Para descrever as falhas que ocorrem entre as manutenções preventivas, utilizamos um modelo estatístico para sistemas reparáveis.
 
@@ -51,11 +51,11 @@ A forma específica utilizada é o **Power Law Process (PLP)**, que é a impleme
 $$
 \rho(t) = \frac{\beta}{\theta}\left(\frac{t}{\theta}\right)^{\beta-1}
 $$  - Os parâmetros $\beta$ (forma) e $\theta$ (escala) são análogos aos da distribuição de Weibull.
-- **Significado de $\beta$**: Se $\beta \> 1$, a taxa de falhas aumenta com o tempo, indicando um processo de desgaste e justificando a necessidade de manutenção preventiva. Se $\beta \< 1$, a confiabilidade melhora com o tempo (mortalidade infantil). Se $\beta = 1$, as falhas são constantes (aleatórias), caracterizando um Processo de Poisson Homogêneo.
+- **Significado de $\beta$**: Se $\beta > 1$, a taxa de falhas aumenta com o tempo, indicando um processo de desgaste e justificando a necessidade de manutenção preventiva. Se $\beta < 1$, a confiabilidade melhora com o tempo (mortalidade infantil). Se $\beta = 1$, as falhas são constantes (aleatórias), caracterizando um Processo de Poisson Homogêneo.
 
-## 3\. Análise dos Dados
+## Análise dos Dados
 
-### 3.1. Estimação dos Parâmetros do Modelo
+### Estimação dos Parâmetros do Modelo
 
 O primeiro passo é estimar os parâmetros $\beta$ e $\theta$ a partir dos dados históricos de falha dos transformadores. Utilizamos o **Método da Máxima Verossimilhança (MLE)**, que encontra os valores dos parâmetros que maximizam a probabilidade de observar os dados coletados.
 
@@ -133,7 +133,7 @@ knitr::kable(
 ```
 O valor de $\beta$ estimado em aproximadamente `r round(beta_estimado_correto, 3)` é crucial para esta análise. Por ser significativamente maior que 1, ele confirma estatisticamente que os transformadores estão em um processo de envelhecimento e desgaste, onde a probabilidade de falha aumenta à medida que o equipamento opera por mais tempo. É este comportamento que justifica economicamente a implementação de uma política de manutenção preventiva, em vez de simplesmente reparar os equipamentos conforme eles falham.
 
-### 3.2. Avaliação da Adequação do Modelo
+### Avaliação da Adequação do Modelo
 
 Para validar nosso modelo, comparamos a **Mean Cumulative Function (MCF)**, que representa a média de falhas acumuladas ao longo do tempo. Comparamos a curva não-paramétrica (calculada diretamente dos dados via estimador de Nelson-Aalen) com a curva paramétrica (prevista pelo nosso modelo PLP com os parâmetros estimados). Se as curvas forem próximas, o modelo é considerado adequado.
 
@@ -150,8 +150,7 @@ ggplot(mcf_na_data, aes(x = tempo, y = mcf)) +
   geom_step(aes(color = "Dados (Nelson-Aalen)"), size = 1.2) +
   stat_function(fun = mcf_parametrica, args = list(beta = beta_estimado_correto, theta = theta_estimado_correto),
                 aes(color = "Modelo (Weibull)"), size = 1) +
-  labs(title = "Avaliação do Modelo (Versão Corrigida)",
-       subtitle = "Com os parâmetros corretos, o ajuste do modelo é excelente.",
+  labs(title = "Avaliação do Modelo",
        x = "Tempo (horas)", y = "Média de Falhas Acumuladas (MCF)", color = "Estimador") +
   scale_color_manual(values = c("Dados (Nelson-Aalen)" = "dodgerblue", "Modelo (Weibull)" = "red")) +
   theme_bw() +
@@ -161,7 +160,7 @@ ggplot(mcf_na_data, aes(x = tempo, y = mcf)) +
 
 A proximidade entre a curva paramétrica (vermelha), prevista por nosso modelo, e a curva não-paramétrica (azul), calculada diretamente dos dados, é notável. O modelo PLP consegue capturar com precisão a dinâmica das falhas: tanto o período inicial de baixa ocorrência quanto a aceleração do processo de desgaste após as 10.000 horas de operação. Essa validação gráfica nos dá um alto grau de confiança para usar este modelo na determinação da política ótima de manutenção.
 
-## 4\. Determinação da Política Ótima de Manutenção
+## Determinação da Política Ótima de Manutenção
 
 O objetivo final é encontrar o intervalo de manutenção preventiva, $\tau$, que minimiza o custo esperado por unidade de tempo, $H(\tau)$. A função de custo é definida como [@gilardoni2007]:
 
@@ -218,8 +217,8 @@ knitr::kable(
 ```
 O intervalo ótimo de **`r round(tau_otimo)` horas** representa o ponto de equilíbrio econômico ideal. Realizar a manutenção antes deste marco seria prematuro e implicaria em custos desnecessários com a substituição de equipamentos ainda confiáveis. Por outro lado, adiar a manutenção para além deste ponto aumenta exponencialmente o risco de falhas em serviço, cujos custos de reparo e multas superam a economia obtida ao estender a vida útil do equipamento. Portanto, este valor não é apenas um resultado estatístico, mas uma recomendação gerencial direta.
 
-## 5\. Conclusão
+## Conclusão
 
-- O processo de falha dos transformadores é bem descrito por um modelo de **desgaste** (PLP com $\beta \> 1$), validando a necessidade de manutenção preventiva.
+- O processo de falha dos transformadores é bem descrito por um modelo de **desgaste** (PLP com $\beta > 1$), validando a necessidade de manutenção preventiva.
 - A análise fornece uma **política de manutenção orientada por dados**: realizar uma manutenção preventiva completa a cada **`r round(tau_otimo)` horas (ou aproximadamente `r round(tau_otimo / 24)` dias)**.
 - Adotar este intervalo ótimo permite à empresa minimizar os custos operacionais totais, equilibrando os gastos com manutenções planejadas e os custos mais elevados de reparos corretivos não planejados.
