@@ -12,8 +12,15 @@ format:
     slide-level: 2
     theme: sky
     self-contained: true
+  pdf:
+    toc: true
+    number-sections: true
 lang: pt
 ---
+
+## Resumo
+
+Este trabalho apresenta um modelo de otimização de manutenção para uma frota de transformadores de alta potência. Utilizando dados históricos de falhas, modelamos o processo de degradação através de um Processo de Poisson Não Homogêneo (NHPP) na forma de Lei de Potência (PLP). Os parâmetros do modelo, estimados por Máxima Verossimilhança, indicam um claro processo de desgaste ($\beta > 1$). Com base neste modelo e em uma análise de custo, determinamos uma política de manutenção preventiva ótima que minimiza os custos operacionais a longo prazo, estabelecendo um intervalo de substituição de aproximadamente 6286 horas.
 
 ```{r setup, include=FALSE}
 library(dplyr)
@@ -29,7 +36,7 @@ O objetivo deste trabalho é determinar uma política ótima de manutenção par
 Nesta análise, consideramos dois tipos de intervenção:
 
   - **Reparo Mínimo (MR - *Minimal Repair*):** Realizado após uma falha. Restaura a função do equipamento, mas o retorna à condição de confiabilidade exata de antes da falha, ou seja, "tão ruim quanto antes" (*bad as old*) [@barlow1975; @brown1981].
-  - **Manutenção Preventiva (PM - *Preventive Maintenance*):** Ação planejada e completa que retorna o sistema a um estado de "como novo" (*good as new*) [@nakagawa2007].
+  - **Manutenção Preventiva (PM - *Preventive Maintenance*):** Ação planejada e completa que retorna o sistema a um estado de "como novo" (*good as new*) [@nakagawa2007]. Para encontrar o equilíbrio ideal entre essas intervenções, é fundamental modelar matematicamente como as falhas ocorrem ao longo do tempo.
 
 ## 2\. Modelagem do Processo de Falhas
 
@@ -67,24 +74,34 @@ dados_lista <- dados_trafo %>%
   )
 
 neg_log_likelihood_plp <- function(params, dados) {
-  beta <- params[1]; theta <- params[2]
+  beta <- params[1]
+  theta <- params[2]
+  
+  # Parâmetros devem ser positivos
   if (beta <= 0 || theta <= 0) return(Inf)
-
+  
+  # sapply itera sobre cada sistema (cada linha de 'dados_lista')
   total_log_likelihood <- sum(sapply(1:nrow(dados), function(i) {
     tempos_falha <- unlist(dados$falhas[[i]])
     tempo_max <- dados$tempo_final[i]
     
+    # Termo da verossimilhança para as falhas observadas
+    # log(intensidade) = log(dweibull/pweibull)
     log_intensidade <- 0
     if (length(tempos_falha) > 0) {
-      log_intensidade <- sum(dweibull(tempos_falha, shape = beta, scale = theta, log = TRUE) -
+      log_intensidade <- sum(dweibull(tempos_falha, shape = beta, scale = theta, log = TRUE) - 
                                pweibull(tempos_falha, shape = beta, scale = theta, lower.tail = FALSE, log.p = TRUE))
     }
+    
+    # Termo da verossimilhança para o período total de observação
+    # Intensidade acumulada M(T) = (T / theta)^beta
     intensidade_acumulada <- (tempo_max / theta)^beta
     
-    log_likelihood_unit <- log_intensidade - intensidade_acumulada
-    return(log_likelihood_unit)
+    # Log-verossimilhança para este sistema
+    return(log_intensidade - intensidade_acumulada)
   }))
-
+  
+  # A função optim minimiza, então retornamos o valor negativo
   return(-total_log_likelihood)
 }
 
@@ -94,7 +111,8 @@ otimizacao_corrigida <- optim(
   fn = neg_log_likelihood_plp, 
   dados = dados_lista,
   method = "BFGS",
-  control = list(parscale = valores_iniciais)
+  control = list(parscale = valores_iniciais), # Conforme final.r
+  hessian = TRUE # Mantido para informações adicionais
 )
 beta_estimado_correto <- otimizacao_corrigida$par[1]
 theta_estimado_correto <- otimizacao_corrigida$par[2]
@@ -102,11 +120,18 @@ theta_estimado_correto <- otimizacao_corrigida$par[2]
 
 **Resultados da Estimação:**
 ```{r print_estimacao, echo=FALSE}
-cat("Parâmetros do Modelo Power Law Process (PLP) Estimados via MLE:\n\n")
-cat(paste0("  - **Beta (Forma):** ", round(beta_estimado_correto, 4), "\n"))
-cat(paste0("  - **Theta (Escala):** ", round(theta_estimado_correto, 2), "\n"))
+resultado_params <- data.frame(
+  Parâmetro = c("Beta (Forma)", "Theta (Escala)"),
+  `Valor Estimado` = c(beta_estimado_correto, theta_estimado_correto)
+)
+
+knitr::kable(
+  resultado_params,
+  caption = "Parâmetros Estimados para o Modelo PLP via Máxima Verossimilhança.",
+  digits = 4
+)
 ```
-O valor de **$\beta \approx 1.995$** é significativamente maior que 1, o que confirma a hipótese de um processo de desgaste acelerado e reforça a necessidade de uma política de manutenção preventiva.
+O valor de $\beta$ estimado em aproximadamente `r round(beta_estimado_correto, 3)` é crucial para esta análise. Por ser significativamente maior que 1, ele confirma estatisticamente que os transformadores estão em um processo de envelhecimento e desgaste, onde a probabilidade de falha aumenta à medida que o equipamento opera por mais tempo. É este comportamento que justifica economicamente a implementação de uma política de manutenção preventiva, em vez de simplesmente reparar os equipamentos conforme eles falham.
 
 ### 3.2. Avaliação da Adequação do Modelo
 
@@ -134,7 +159,7 @@ ggplot(mcf_na_data, aes(x = tempo, y = mcf)) +
   coord_cartesian(xlim = c(0, 22000))
 ```
 
-A forte sobreposição entre as curvas no gráfico acima demonstra que o modelo PLP ajustado descreve o processo de falhas dos transformadores com excelente precisão.
+A proximidade entre a curva paramétrica (vermelha), prevista por nosso modelo, e a curva não-paramétrica (azul), calculada diretamente dos dados, é notável. O modelo PLP consegue capturar com precisão a dinâmica das falhas: tanto o período inicial de baixa ocorrência quanto a aceleração do processo de desgaste após as 10.000 horas de operação. Essa validação gráfica nos dá um alto grau de confiança para usar este modelo na determinação da política ótima de manutenção.
 
 ## 4\. Determinação da Política Ótima de Manutenção
 
@@ -167,7 +192,7 @@ ggplot(dados_custo, aes(x = tau, y = custo)) +
            x = tau_otimo, 
            y = custo_otimo + (max(dados_custo$custo, na.rm = TRUE) - min(dados_custo$custo, na.rm = TRUE))*0.05, 
            label = paste0("Ponto Ótimo\nτ* ≈ ", round(tau_otimo), " horas\nH(τ*) ≈ ", format(custo_otimo, scientific = FALSE, digits = 5)),
-           hjust = 0.5, vjust = 0, 
+           hjust = 0.5, vjust = -0.5, 
            size=3.5
            ) +
   labs(title = "Função de Custo da Manutenção Preventiva (Focado no Ótimo)",
@@ -180,11 +205,21 @@ ggplot(dados_custo, aes(x = tau, y = custo)) +
 
 **Política Ótima de Manutenção:**
 ```{r print_otimo, echo=FALSE}
-cat(paste0("  - **Intervalo ótimo (τ*):** ", round(tau_otimo), " horas.\n"))
-cat(paste0("  - **Equivalente a:** Aproximadamente ", round(tau_otimo/24), " dias.\n"))
+resultado_politica <- data.frame(
+  Métrica = c("Intervalo Ótimo (τ*) em Horas", "Intervalo Ótimo (τ*) em Dias"),
+  Valor = c(round(tau_otimo), round(tau_otimo / 24))
+)
+
+knitr::kable(
+  resultado_politica,
+  caption = "Política de Manutenção Preventiva Ótima.",
+  col.names = c("Métrica", "Valor Recomendado")
+)
 ```
+O intervalo ótimo de **`r round(tau_otimo)` horas** representa o ponto de equilíbrio econômico ideal. Realizar a manutenção antes deste marco seria prematuro e implicaria em custos desnecessários com a substituição de equipamentos ainda confiáveis. Por outro lado, adiar a manutenção para além deste ponto aumenta exponencialmente o risco de falhas em serviço, cujos custos de reparo e multas superam a economia obtida ao estender a vida útil do equipamento. Portanto, este valor não é apenas um resultado estatístico, mas uma recomendação gerencial direta.
+
 ## 5\. Conclusão
 
 - O processo de falha dos transformadores é bem descrito por um modelo de **desgaste** (PLP com $\beta \> 1$), validando a necessidade de manutenção preventiva.
-- A análise fornece uma **política de manutenção orientada por dados**: realizar uma manutenção preventiva completa a cada **\~6213 horas (ou \~259 dias)**.
+- A análise fornece uma **política de manutenção orientada por dados**: realizar uma manutenção preventiva completa a cada **`r round(tau_otimo)` horas (ou aproximadamente `r round(tau_otimo / 24)` dias)**.
 - Adotar este intervalo ótimo permite à empresa minimizar os custos operacionais totais, equilibrando os gastos com manutenções planejadas e os custos mais elevados de reparos corretivos não planejados.
