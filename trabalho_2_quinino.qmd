@@ -102,7 +102,7 @@ theta_estimado_correto <- otimizacao_corrigida$par[2]
 
 **Resultados da Estimação:**
 ```{r print_estimacao, echo=FALSE}
-cat("Parâmetros do Modelo Power Law Process (PLP) Estimados via MLE (versão final.r):\n\n")
+cat("Parâmetros do Modelo Power Law Process (PLP) Estimados via MLE:\n\n")
 cat(paste0("  - **Beta (Forma):** ", round(beta_estimado_correto, 4), "\n"))
 cat(paste0("  - **Theta (Escala):** ", round(theta_estimado_correto, 2), "\n"))
 ```
@@ -188,5 +188,3 @@ cat(paste0("  - **Equivalente a:** Aproximadamente ", round(tau_otimo/24), " dia
 - O processo de falha dos transformadores é bem descrito por um modelo de **desgaste** (PLP com $\beta \> 1$), validando a necessidade de manutenção preventiva.
 - A análise fornece uma **política de manutenção orientada por dados**: realizar uma manutenção preventiva completa a cada **\~6213 horas (ou \~259 dias)**.
 - Adotar este intervalo ótimo permite à empresa minimizar os custos operacionais totais, equilibrando os gastos com manutenções planejadas e os custos mais elevados de reparos corretivos não planejados.
-
-:::
